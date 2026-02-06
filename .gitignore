@@ -21,6 +21,3 @@ node_modules/
 # OS files
 .DS_Store
 Thumbs.db
-
-# Firebase service account
-src/services/serviceAccount.json
