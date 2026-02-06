@@ -1,0 +1,42 @@
+{
+  "name": "e-commerce-modules",
+  "version": "1.0.0",
+  "main": "server.js",
+  "description": "E-commerce with modules",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MohamedAbdElsamieCoding/E-commerce--Api.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/MohamedAbdElsamieCoding/E-commerce--Api/issues"
+  },
+  "homepage": "https://github.com/MohamedAbdElsamieCoding/E-commerce--Api#readme",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.3.0",
+    "@prisma/client": "^7.3.0",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.2.1",
+    "@types/pg": "^8.16.0",
+    "prisma": "^6.19.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

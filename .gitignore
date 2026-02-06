@@ -1,0 +1,26 @@
+# Testing coverage
+coverage/
+
+# Environment
+.env
+
+# Build output
+dist/
+build/
+
+# Node Modules
+node_modules/
+
+#Logs
+*.log
+
+# Local IDE settings
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Firebase service account
+src/services/serviceAccount.json
