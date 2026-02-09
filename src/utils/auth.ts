@@ -1,7 +1,15 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { JwtPayload } from "../types/jwt-payload-type.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
+export const JWT_ACCESS_SECRET =
+  process.env.JWT_ACCESS_SECRET || "fallback_secret";
+export const JWT_REFRESH_SECRET =
+  process.env.JWT_REFRESH_SECRET || "fallback_secret";
+
+interface JwtError extends Error {
+  name: "TokenExpiredError" | "JsonWebTokenError";
+}
 
 /**
  *
@@ -31,8 +39,17 @@ export const comparePassword = async (
  * @param userId
  * @returns
  */
-export const generateToken = (userId: string) => {
-  return jwt.sign(userId, JWT_SECRET, { expiresIn: "30d" });
+export const generateAccessToken = (userId: string) => {
+  return jwt.sign({ id: userId }, JWT_ACCESS_SECRET, { expiresIn: "7d" });
+};
+
+/**
+ *
+ * @param userId
+ * @returns
+ */
+export const generateRefreshToken = (userId: string) => {
+  return jwt.sign({ id: userId }, JWT_REFRESH_SECRET, { expiresIn: "15m" });
 };
 
 /**
@@ -40,10 +57,25 @@ export const generateToken = (userId: string) => {
  * @param token
  * @returns
  */
-export const verifyToken = (token: string) => {
+export const verifyToken = (
+  token: string,
+  secret: string = JWT_ACCESS_SECRET,
+): JwtPayload | null => {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, secret);
+    return decoded as JwtPayload;
   } catch (err) {
+    const error = err as JwtError;
+    if (error.name === "TokenExpiredError") {
+      console.log("Token expired");
+      return null;
+    }
+
+    if (error.name === "JsonWebTokenError") {
+      console.log("Invalid token");
+      return null;
+    }
+
     return null;
   }
 };

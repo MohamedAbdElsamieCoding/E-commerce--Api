@@ -5,5 +5,10 @@ export const registerSchema = z.object({
   lastName: z.string().min(2, "Must be at least 2 character").nonempty(),
   userName: z.string().nonempty(),
   email: z.email("Invalid email format"),
-  password: z.string().min(8, "Password must be at least 8 character"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export const loginSchema = z.object({
+  email: z.email("Invalid email format"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
