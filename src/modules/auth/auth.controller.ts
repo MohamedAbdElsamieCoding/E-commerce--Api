@@ -10,11 +10,13 @@ import {
   generateAccessToken,
   verifyToken,
   JWT_REFRESH_SECRET,
+  generateResetToken,
 } from "../../utils/auth.js";
 import { generateRefreshToken } from "../../utils/auth.js";
 import { sendResponse } from "../../utils/response.js";
 import { setRefreshToCookies as setRefreshToCookies } from "../../utils/set-cookies.js";
 import { JwtPayload } from "../../types/jwt-payload-type.js";
+import { sendResetPasswordEmail } from "./auth.service.js";
 
 export const register = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -161,5 +163,25 @@ export const logout = asyncHandler(
     }
     res.clearCookie("refreshToken");
     sendResponse(res, 200, httpStatusText.SUCCESS, "Logged out successfully");
+  },
+);
+
+export const forgotPassword = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { email } = req.body;
+    if (!email)
+      return next(new AppError("Email is required", httpStatusText.FAIL, 400));
+    const user = await prisma.user.findUnique({ where: { email: email } });
+    if (!user)
+      return next(new AppError("User not found", httpStatusText.ERROR, 404));
+    const resetToken = generateResetToken(user.id);
+    await prisma.user.update({
+      where: { email: user.email },
+      data: { resetToken, resetTokenEx: new Date(Date.now() + 3600 * 1000) },
+    });
+
+    await sendResetPasswordEmail(email, resetToken);
+
+    sendResponse(res, 200, httpStatusText.SUCCESS, "Reset link sent to email");
   },
 );

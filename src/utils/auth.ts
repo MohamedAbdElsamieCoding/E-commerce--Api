@@ -54,6 +54,15 @@ export const generateRefreshToken = (userId: string) => {
 
 /**
  *
+ * @param userId
+ * @returns
+ */
+export const generateResetToken = (userId: string) => {
+  return jwt.sign({ id: userId }, JWT_ACCESS_SECRET, { expiresIn: "1h" });
+};
+
+/**
+ *
  * @param token
  * @returns
  */

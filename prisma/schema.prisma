@@ -6,10 +6,11 @@ datasource db {
     provider = "postgresql"
 }
 
-enum Roles {
+enum Role {
     USER
     ADMIN
-    MANAGER
+    MERCHANT
+	@@map("Roles")
 }
 
 model user {
@@ -19,8 +20,10 @@ model user {
     userName String @unique
     email String    @unique
     password String
-    role Roles @default(USER)
+    role Role @default(USER)
     refreshToken String?
+    resetToken  String?
+    resetTokenEx    DateTime?
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 }
