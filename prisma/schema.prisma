@@ -22,8 +22,6 @@ model user {
     password String
     role Role @default(USER)
     refreshToken String?
-    resetToken  String?
-    resetTokenEx    DateTime?
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 }

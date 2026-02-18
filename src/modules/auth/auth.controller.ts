@@ -1,8 +1,12 @@
 import { Request, Response, NextFunction } from "express";
-import bcrypt from "bcrypt";
 import { prisma } from "../../config/db.js";
 import { asyncHandler } from "../../middlewares/async-handler.js";
-import { loginSchema, registerSchema } from "./auth-schema.js";
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+} from "./auth-schema.js";
 import { AppError } from "../../utils/app-error.js";
 import { httpStatusText } from "../../utils/http-status-text.js";
 import {
@@ -10,13 +14,17 @@ import {
   generateAccessToken,
   verifyToken,
   JWT_REFRESH_SECRET,
-  generateResetToken,
+  generatePasswordResetToken,
+  JWT_RESET_SECRET,
+  hashedPassword,
+  generateRefreshToken,
 } from "../../utils/auth.js";
-import { generateRefreshToken } from "../../utils/auth.js";
 import { sendResponse } from "../../utils/response.js";
 import { setRefreshToCookies as setRefreshToCookies } from "../../utils/set-cookies.js";
 import { JwtPayload } from "../../types/jwt-payload-type.js";
 import { sendResetPasswordEmail } from "./auth.service.js";
+import { redis } from "../../config/redis.js";
+import crypto from "crypto";
 
 export const register = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -37,14 +45,14 @@ export const register = asyncHandler(
       return next(new AppError(message, httpStatusText.FAIL, 400));
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashPassword = await hashedPassword(password);
     const user = await prisma.user.create({
       data: {
         firstName,
         lastName,
         userName,
         email,
-        password: hashedPassword,
+        password: hashPassword,
       },
     });
     const accessToken = generateAccessToken(user.id);
@@ -168,20 +176,49 @@ export const logout = asyncHandler(
 
 export const forgotPassword = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
-    const { email } = req.body;
+    const validateData = forgotPasswordSchema.parse(req.body);
+    const { email } = validateData;
     if (!email)
       return next(new AppError("Email is required", httpStatusText.FAIL, 400));
     const user = await prisma.user.findUnique({ where: { email: email } });
-    if (!user)
-      return next(new AppError("User not found", httpStatusText.ERROR, 404));
-    const resetToken = generateResetToken(user.id);
-    await prisma.user.update({
-      where: { email: user.email },
-      data: { resetToken, resetTokenEx: new Date(Date.now() + 3600 * 1000) },
-    });
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      await redis.set(`reset:${resetToken}`, user.id, { EX: 600 });
+      const jwtToken = generatePasswordResetToken(resetToken);
 
-    await sendResetPasswordEmail(email, resetToken);
+      await sendResetPasswordEmail(email, jwtToken);
+    }
 
     sendResponse(res, 200, httpStatusText.SUCCESS, "Reset link sent to email");
+  },
+);
+
+export const resetPassword = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const validateData = resetPasswordSchema.parse(req.body);
+    const { token } = req.params;
+    const { password } = validateData;
+    const decoded = verifyToken(
+      token as string,
+      JWT_RESET_SECRET,
+    ) as JwtPayload;
+    const userId = await redis.get(`reset:${decoded.token}`);
+    if (!userId)
+      return next(
+        new AppError("Invalid or expired link", httpStatusText.FAIL, 400),
+      );
+    const hashPassword = await hashedPassword(password);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashPassword },
+    });
+    await redis.del(`reset:${decoded.token}`);
+
+    sendResponse(
+      res,
+      200,
+      httpStatusText.SUCCESS,
+      "Password updated successfully",
+    );
   },
 );

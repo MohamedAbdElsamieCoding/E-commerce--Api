@@ -6,6 +6,8 @@ export const JWT_ACCESS_SECRET =
   process.env.JWT_ACCESS_SECRET || "fallback_secret";
 export const JWT_REFRESH_SECRET =
   process.env.JWT_REFRESH_SECRET || "fallback_secret";
+export const JWT_RESET_SECRET =
+  process.env.JWT_RESET_SECRET || "fallback_secret";
 
 interface JwtError extends Error {
   name: "TokenExpiredError" | "JsonWebTokenError";
@@ -57,8 +59,10 @@ export const generateRefreshToken = (userId: string) => {
  * @param userId
  * @returns
  */
-export const generateResetToken = (userId: string) => {
-  return jwt.sign({ id: userId }, JWT_ACCESS_SECRET, { expiresIn: "1h" });
+export const generatePasswordResetToken = (resetToken: string) => {
+  return jwt.sign({ token: resetToken }, JWT_RESET_SECRET, {
+    expiresIn: "10m",
+  });
 };
 
 /**
