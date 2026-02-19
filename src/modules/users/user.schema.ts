@@ -8,3 +8,15 @@ export const updateMeSchema = z
     email: z.email("Invalid email format"),
   })
   .partial();
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z
+      .string()
+      .min(8, "Password must be at least 8 characters"),
+    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+  })
+  .refine((data) => data.newPassword !== data.currentPassword, {
+    message: "New password must be different from current password",
+    path: ["newPassword"],
+  });
