@@ -1,10 +1,9 @@
 import { Role } from "@prisma/client";
 
-export type UpdatedUserDTO = {
+export interface AdminUpdateUserDTO {
   firstName?: string;
   lastName?: string;
   userName?: string;
-  email?: string;
-  isActive?: boolean;
   role?: Role;
-};
+  isActive?: boolean;
+}

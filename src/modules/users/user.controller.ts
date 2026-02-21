@@ -8,7 +8,13 @@ import { UpdatedUserDTO } from "../../types/updated-data-type";
 import { changePasswordSchema, updateMeSchema } from "./user.schema";
 import { comparePassword, hashedPassword } from "../../utils/auth";
 import { Status } from "../../types/status-type";
-import { Prisma } from "@prisma/client";
+import { AdminUpdateUserDTO } from "../../types/update-user-admin";
+import {
+  getAllUsersService,
+  getUserByIdService,
+  updateUserService,
+} from "./user.service";
+import { GetUserQueryDTO } from "../../types/get-user-queryDTO";
 
 // User Management
 export const getMe = asyncHandler(
@@ -123,55 +129,46 @@ export const deleteMe = asyncHandler(
 );
 
 // Admin Management
-export const getAllUsers = asyncHandler(
-  async (req: Request, res: Response, _next: NextFunction) => {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
+  const query: GetUserQueryDTO = {
+    page: req.query.page ? Number(req.query.page) : 1,
+    limit: req.query.limit ? Number(req.query.limit) : 10,
+    search: req.query.search as string | undefined,
+    status: req.query.status as Status | undefined,
+  };
 
-    const search = req.query.search as string | undefined;
-    const status = req.query.status as Status | undefined;
-    const where: Prisma.userWhereInput = {};
-    if (search) {
-      where.OR = [
-        {
-          email: { contains: search, mode: "insensitive" },
-          userName: { contains: search, mode: "insensitive" },
-        },
-      ];
-    }
-    if (status === "active") where.isActive = true;
-    if (status === "deleted") where.isActive = false;
+  const result = await getAllUsersService(query);
 
-    const [users, totalUsers] = await prisma.$transaction([
-      prisma.user.findMany({
-        where,
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          email: true,
-          userName: true,
-          firstName: true,
-          lastName: true,
-          isActive: true,
-          deletedAt: true,
-        },
-      }),
-      prisma.user.count({ where }),
-    ]);
-    sendResponse(
-      res,
-      200,
-      httpStatusText.SUCCESS,
-      "Users fetched successfully",
-      {
-        results: users.length,
-        total: totalUsers,
-        page,
-        pages: Math.ceil(totalUsers / limit),
-        data: users,
-      },
-    );
-  },
-);
+  sendResponse(
+    res,
+    200,
+    httpStatusText.SUCCESS,
+    "Users fetched successfully",
+    result,
+  );
+});
+
+export const getUserById = asyncHandler(async (req: Request, res: Response) => {
+  const { userId: id } = req.params;
+  if (!id) throw new AppError("User id is required", httpStatusText.FAIL, 400);
+
+  const user = await getUserByIdService(id as string);
+
+  sendResponse(res, 200, httpStatusText.SUCCESS, "User fetched successfully", {
+    data: user,
+  });
+});
+
+export const updateUser = asyncHandler(async (req: Request, res: Response) => {
+  const { userId: id } = req.params;
+  if (!id) new AppError("User id is required", httpStatusText.FAIL, 400);
+
+  const updatedUser = await updateUserService(
+    id as string,
+    req.body as AdminUpdateUserDTO,
+  );
+
+  sendResponse(res, 200, httpStatusText.SUCCESS, "User updated successfully", {
+    data: updatedUser,
+  });
+});
