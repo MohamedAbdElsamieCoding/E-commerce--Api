@@ -2,6 +2,61 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/db";
 import { UpdatedUserDTO } from "../../types/updated-data-type";
 
+// User Repository
+
+export const findUserProfileById = (id: string) => {
+  return prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      userName: true,
+      role: true,
+      createdAt: true,
+    },
+  });
+};
+
+export const findUserByEmailOrUsername = (
+  userId: string,
+  email?: string,
+  userName?: string,
+) => {
+  return prisma.user.findFirst({
+    where: {
+      NOT: { id: userId },
+      OR: [email ? { email } : {}, userName ? { userName } : {}],
+    },
+  });
+};
+
+export const updateUser = (id: string, data: UpdatedUserDTO) => {
+  return prisma.user.update({
+    where: { id },
+    data,
+  });
+};
+
+export const updateUserPassword = (id: string, password: string) => {
+  return prisma.user.update({
+    where: { id },
+    data: { password },
+  });
+};
+
+export const softDeleteUserById = (id: string) => {
+  return prisma.user.update({
+    where: { id },
+    data: {
+      isActive: false,
+      deletedAt: new Date(),
+    },
+  });
+};
+
+// Admin Repository
 export const findUserById = (id: string) => {
   return prisma.user.findUnique({ where: { id } });
 };
@@ -60,6 +115,7 @@ export const findUsers = (
     },
   });
 };
+
 export const countUsers = (where: Prisma.userWhereInput) => {
   return prisma.user.count({ where });
 };

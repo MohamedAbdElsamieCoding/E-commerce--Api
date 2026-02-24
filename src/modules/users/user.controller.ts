@@ -6,12 +6,15 @@ import { httpStatusText } from "../../utils/http-status-text";
 import { AppError } from "../../utils/app-error";
 import { UpdatedUserDTO } from "../../types/updated-data-type";
 import { changePasswordSchema, updateMeSchema } from "./user.schema";
-import { comparePassword, hashedPassword } from "../../utils/auth";
 import { Status } from "../../types/status-type";
 import { AdminUpdateUserDTO } from "../../types/update-user-admin";
 import {
+  changePasswordService,
+  deleteMeService,
   getAllUsersService,
+  getMeService,
   getUserByIdService,
+  updateMeService,
   updateUserService,
 } from "./user.service";
 import { GetUserQueryDTO } from "../../types/get-user-queryDTO";
@@ -20,18 +23,8 @@ import { GetUserQueryDTO } from "../../types/get-user-queryDTO";
 export const getMe = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction) => {
     const userId = req.user?.id;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        userName: true,
-        role: true,
-        createdAt: true,
-      },
-    });
+    const user = await getMeService(userId as string);
+    // Need Cashing here
     sendResponse(
       res,
       200,
@@ -42,67 +35,26 @@ export const getMe = asyncHandler(
   },
 );
 
-export const updateMe = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const userId = req.user?.id;
-    const validateData = updateMeSchema.parse(req.body);
-    const updatedData: UpdatedUserDTO = validateData;
+export const updateMe = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  if (!userId) throw new AppError("Unauthorized", httpStatusText.FAIL, 401);
 
-    if (updatedData.email || updatedData.userName) {
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          NOT: { id: userId },
-          OR: [
-            updatedData.email ? { email: updatedData.email } : {},
-            updatedData.userName ? { userName: updatedData.userName } : {},
-          ],
-        },
-      });
-      if (existingUser) {
-        if (existingUser.email === updatedData.email)
-          return next(
-            new AppError("Email already exists", httpStatusText.FAIL, 400),
-          );
-        if (existingUser.userName === updatedData.userName)
-          return next(
-            new AppError("Username already exists", httpStatusText.FAIL, 400),
-          );
-      }
-    }
+  const validateData = updateMeSchema.parse(req.body);
+  await updateMeService(userId, validateData);
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: updatedData,
-    });
-
-    sendResponse(res, 200, httpStatusText.SUCCESS, "Data updated successfully");
-  },
-);
+  sendResponse(res, 200, httpStatusText.SUCCESS, "Data updated successfully");
+});
 
 export const changePassword = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response) => {
     const validateData = changePasswordSchema.parse(req.body);
     const { currentPassword, newPassword } = validateData;
-    const userId = req.user?.id;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-    if (!user)
-      return next(new AppError("User not found", httpStatusText.FAIL, 404));
-    const validatePassword = await comparePassword(
-      currentPassword,
-      user.password,
-    );
-    if (!validatePassword)
-      return next(
-        new AppError("Password is incorrect", httpStatusText.FAIL, 400),
-      );
 
-    const newHashedPassword = await hashedPassword(newPassword);
-    await prisma.user.update({
-      where: { id: userId },
-      data: { password: newHashedPassword },
-    });
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized", httpStatusText.FAIL, 401);
+
+    await changePasswordService(userId, currentPassword, newPassword);
+
     sendResponse(
       res,
       200,
@@ -112,21 +64,19 @@ export const changePassword = asyncHandler(
   },
 );
 
-export const deleteMe = asyncHandler(
-  async (req: Request, res: Response, _next: NextFunction) => {
-    const userId = req.user?.id;
-    await prisma.user.update({
-      where: { id: userId },
-      data: { isActive: false, deletedAt: new Date() },
-    });
-    sendResponse(
-      res,
-      204,
-      httpStatusText.SUCCESS,
-      "Account deactivated successfully",
-    );
-  },
-);
+export const deleteMe = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  if (!userId) throw new AppError("Unauthorized", httpStatusText.FAIL, 401);
+
+  await deleteMeService(userId);
+
+  sendResponse(
+    res,
+    204,
+    httpStatusText.SUCCESS,
+    "Account deactivated successfully",
+  );
+});
 
 // Admin Management
 export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
