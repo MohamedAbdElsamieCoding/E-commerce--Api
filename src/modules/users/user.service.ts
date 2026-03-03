@@ -65,6 +65,13 @@ export const changePasswordService = async (
     throw new AppError("Account is deactivated", httpStatusText.FAIL, 403);
 
   const isMatched = await comparePassword(currentPassword, user.password);
+  if (!isMatched)
+    throw new AppError(
+      "Current password is incorrect",
+      httpStatusText.FAIL,
+      401,
+    );
+
   if (currentPassword === newPassword)
     throw new AppError(
       "New password must be different from current password",
@@ -94,10 +101,8 @@ export const getAllUsersService = async (query: GetUserQueryDTO) => {
   const where: Prisma.userWhereInput = {};
   if (query.search) {
     where.OR = [
-      {
-        email: { contains: query.search, mode: "insensitive" },
-        userName: { contains: query.search, mode: "insensitive" },
-      },
+      { email: { contains: query.search, mode: "insensitive" } },
+      { userName: { contains: query.search, mode: "insensitive" } },
     ];
   }
   if (query.status === "active") where.isActive = true;

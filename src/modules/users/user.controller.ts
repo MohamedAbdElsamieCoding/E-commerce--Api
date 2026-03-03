@@ -1,10 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { asyncHandler } from "../../middlewares/async-handler";
-import { prisma } from "../../config/db";
 import { sendResponse } from "../../utils/response";
 import { httpStatusText } from "../../utils/http-status-text";
 import { AppError } from "../../utils/app-error";
-import { UpdatedUserDTO } from "../../types/updated-data-type";
 import { changePasswordSchema, updateMeSchema } from "./user.schema";
 import { Status } from "../../types/status-type";
 import { AdminUpdateUserDTO } from "../../types/update-user-admin";
@@ -72,7 +70,7 @@ export const deleteMe = asyncHandler(async (req: Request, res: Response) => {
 
   sendResponse(
     res,
-    204,
+    200,
     httpStatusText.SUCCESS,
     "Account deactivated successfully",
   );
@@ -111,7 +109,7 @@ export const getUserById = asyncHandler(async (req: Request, res: Response) => {
 
 export const updateUser = asyncHandler(async (req: Request, res: Response) => {
   const { userId: id } = req.params;
-  if (!id) new AppError("User id is required", httpStatusText.FAIL, 400);
+  if (!id) throw new AppError("User id is required", httpStatusText.FAIL, 400);
 
   const updatedUser = await updateUserService(
     id as string,
