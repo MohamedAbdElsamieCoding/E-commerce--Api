@@ -13,17 +13,56 @@ enum Role {
 	@@map("Roles")
 }
 
-model user {
-    id  String   @id     @default(uuid())
-    firstName    String
-    lastName     String
-    userName     String  @unique
-    email    String     @unique
-    password     String
-    role     Role    @default(USER)
-    refreshToken     String?
-    isActive    Boolean     @default(true)  
-    deletedAt DateTime?
-    createdAt    DateTime   @default(now())
-    updatedAt    DateTime    @updatedAt
+model User {
+    id                  String          @id         @default(uuid())
+    firstName           String
+    lastName            String
+    userName            String          @unique
+    email               String          @unique
+    password            String
+    role                Role                        @default(USER)
+    refreshToken        String?
+    isActive            Boolean                     @default(true)  
+
+    deletedAt           DateTime?
+    createdAt           DateTime                    @default(now())
+    updatedAt           DateTime        @updatedAt
+
+    products            Product[]
+}
+
+model Category {
+    id                  String          @id         @default(uuid())
+    name                String
+    slug                String          @unique
+    description         String?
+
+    parentId            String?
+    parent              Category?       @relation("CategoryHierarchy",fields: [parentId],references: [id])
+    children            Category[]      @relation("CategoryHierarchy")
+
+    createdAt           DateTime                    @default(now())
+    updatedAt           DateTime        @updatedAt
+
+    @@unique([name, parentId])
+    @@index([parentId])
+    products            Product[]
+}
+
+model Product {
+    id                  String          @id         @default(uuid())
+    name                String
+    slug                String          @unique
+    description         String?
+    price               Float
+    stock               Int
+    categoryId          String
+    merchantId          String
+    images              String[]                     @default([])
+
+    category            Category        @relation(fields: [categoryId],references: [id])
+    merchant            User            @relation(fields: [merchantId],references: [id])
+
+    @@index([categoryId])
+    @@index([merchantId])
 }

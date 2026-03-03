@@ -96,7 +96,7 @@ export const findUserDetailsById = (id: string) => {
 };
 
 export const findUsers = (
-  where: Prisma.userWhereInput,
+  where: Prisma.UserWhereInput,
   skip: number,
   take: number,
 ) => {
@@ -116,6 +116,6 @@ export const findUsers = (
   });
 };
 
-export const countUsers = (where: Prisma.userWhereInput) => {
+export const countUsers = (where: Prisma.UserWhereInput) => {
   return prisma.user.count({ where });
 };
