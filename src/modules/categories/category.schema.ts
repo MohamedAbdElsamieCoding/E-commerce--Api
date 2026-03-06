@@ -5,3 +5,5 @@ export const createCategorySchema = z.object({
   description: z.string().optional(),
   parentId: z.string().optional(),
 });
+
+export const updateCategorySchema = createCategorySchema.partial();
