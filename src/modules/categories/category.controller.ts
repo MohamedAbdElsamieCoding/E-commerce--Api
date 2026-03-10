@@ -2,34 +2,23 @@ import { Request, Response, NextFunction } from "express";
 import { asyncHandler } from "../../middlewares/async-handler";
 import { AppError } from "../../utils/app-error";
 import { httpStatusText } from "../../utils/http-status-text";
-import { prisma } from "../../config/db";
-import slugify from "slugify";
 import { createCategorySchema, updateCategorySchema } from "./category.schema";
 import { sendResponse } from "../../utils/response";
+import {
+  createCategoryService,
+  deleteCategoryService,
+  getAllCategoriesService,
+  getCategoryByIdService,
+  getCategoryBySlugService,
+  updateCategoryService,
+} from "./category.service";
 
 export const createCategory = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, _next: NextFunction) => {
     const data = createCategorySchema.parse(req.body);
-    const slug = slugify(data.name, { lower: true, strict: true });
 
-    if (data.parentId) {
-      const parent = await prisma.category.findUnique({
-        where: { id: data.parentId },
-      });
-      if (!parent)
-        return next(
-          new AppError("Parent category not found", httpStatusText.FAIL, 404),
-        );
-    }
+    const category = await createCategoryService(data);
 
-    const category = await prisma.category.create({
-      data: {
-        name: data.name,
-        slug,
-        description: data.description,
-        parentId: data.parentId || null,
-      },
-    });
     sendResponse(
       res,
       201,
@@ -42,10 +31,8 @@ export const createCategory = asyncHandler(
 
 export const getAllCategories = asyncHandler(
   async (_req: Request, res: Response, _next: NextFunction) => {
-    const categories = await prisma.category.findMany({
-      where: { parentId: null },
-      include: { children: true },
-    });
+    const categories = await getAllCategoriesService();
+
     sendResponse(
       res,
       200,
@@ -57,14 +44,10 @@ export const getAllCategories = asyncHandler(
 );
 
 export const getCategoryBySlug = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, _next: NextFunction) => {
     const slug = req.params.slug as string;
-    const category = await prisma.category.findUnique({
-      where: { slug },
-      include: { children: true, parent: true },
-    });
-    if (!category)
-      return next(new AppError("Category not found", httpStatusText.FAIL, 404));
+    const category = await getCategoryBySlugService(slug);
+
     sendResponse(
       res,
       200,
@@ -76,14 +59,10 @@ export const getCategoryBySlug = asyncHandler(
 );
 
 export const getCategoryById = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, _next: NextFunction) => {
     const id = req.params.id as string;
-    const category = await prisma.category.findUnique({
-      where: { id },
-      include: { children: true, parent: true },
-    });
-    if (!category)
-      return next(new AppError("Category not found", httpStatusText.FAIL, 404));
+    const category = await getCategoryByIdService(id);
+
     sendResponse(
       res,
       200,
@@ -95,31 +74,11 @@ export const getCategoryById = asyncHandler(
 );
 
 export const updateCategory = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, _next: NextFunction) => {
     const id = req.params.id as string;
     const data = updateCategorySchema.parse(req.body);
 
-    let slug: string | undefined;
-    if (data.name) {
-      slug = slugify(data.name, { lower: true, strict: true });
-    }
-    if (data.parentId) {
-      const parent = await prisma.category.findUnique({
-        where: { id: data.parentId },
-      });
-      if (!parent)
-        return next(
-          new AppError("Parent category not found", httpStatusText.FAIL, 404),
-        );
-    }
-
-    const category = await prisma.category.update({
-      where: { id },
-      data: {
-        ...data,
-        slug,
-      },
-    });
+    const category = await updateCategoryService(id, data);
 
     sendResponse(
       res,
@@ -134,9 +93,9 @@ export const updateCategory = asyncHandler(
 export const deleteCategory = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction) => {
     const id = req.params.id as string;
-    await prisma.category.delete({
-      where: { id },
-    });
+
+    await deleteCategoryService(id);
+
     sendResponse(
       res,
       200,
