@@ -16,13 +16,31 @@ import {
   updateUserService,
 } from "./user.service";
 import { GetUserQueryDTO } from "../../types/get-user-queryDTO";
+import { redis } from "../../config/redis.js";
 
 // User Management
 export const getMe = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction) => {
     const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized", httpStatusText.FAIL, 401);
+
+    const cacheKey = `user:${userId}`;
+    const cachedUser = await redis.get(cacheKey);
+
+    if (cachedUser) {
+      return sendResponse(
+        res,
+        200,
+        httpStatusText.SUCCESS,
+        "User fetched successfully",
+        { user: JSON.parse(cachedUser) },
+      );
+    }
+
     const user = await getMeService(userId as string);
-    // Need Cashing here
+
+    await redis.set(cacheKey, JSON.stringify(user), { EX: 3600 });
+
     sendResponse(
       res,
       200,
@@ -40,6 +58,8 @@ export const updateMe = asyncHandler(async (req: Request, res: Response) => {
   const validateData = updateMeSchema.parse(req.body);
   await updateMeService(userId, validateData);
 
+  await redis.del(`user:${userId}`);
+
   sendResponse(res, 200, httpStatusText.SUCCESS, "Data updated successfully");
 });
 
@@ -52,6 +72,8 @@ export const changePassword = asyncHandler(
     if (!userId) throw new AppError("Unauthorized", httpStatusText.FAIL, 401);
 
     await changePasswordService(userId, currentPassword, newPassword);
+
+    await redis.del(`user:${userId}`);
 
     sendResponse(
       res,
@@ -67,6 +89,8 @@ export const deleteMe = asyncHandler(async (req: Request, res: Response) => {
   if (!userId) throw new AppError("Unauthorized", httpStatusText.FAIL, 401);
 
   await deleteMeService(userId);
+
+  await redis.del(`user:${userId}`);
 
   sendResponse(
     res,
@@ -115,6 +139,8 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
     id as string,
     req.body as AdminUpdateUserDTO,
   );
+
+  await redis.del(`user:${id}`);
 
   sendResponse(res, 200, httpStatusText.SUCCESS, "User updated successfully", {
     data: updatedUser,

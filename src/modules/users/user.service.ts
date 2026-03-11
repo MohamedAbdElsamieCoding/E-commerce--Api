@@ -98,7 +98,7 @@ export const getAllUsersService = async (query: GetUserQueryDTO) => {
   const limit = query.limit && query.limit > 0 ? query.limit : 10;
   const skip = (page - 1) * limit;
 
-  const where: Prisma.userWhereInput = {};
+  const where: Prisma.UserWhereInput = {};
   if (query.search) {
     where.OR = [
       { email: { contains: query.search, mode: "insensitive" } },

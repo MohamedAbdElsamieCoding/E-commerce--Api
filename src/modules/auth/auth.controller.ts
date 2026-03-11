@@ -22,46 +22,22 @@ import {
 import { sendResponse } from "../../utils/response.js";
 import { setRefreshToCookies as setRefreshToCookies } from "../../utils/set-cookies.js";
 import { JwtPayload } from "../../types/jwt-payload-type.js";
-import { sendResetPasswordEmail } from "./auth.service.js";
+import {
+  forgotPasswordService,
+  loginService,
+  logoutService,
+  refreshTokenService,
+  registerService,
+  resetPasswordService,
+  sendResetPasswordEmail,
+} from "./auth.service.js";
 import { redis } from "../../config/redis.js";
 import crypto from "crypto";
 
 export const register = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, _next: NextFunction) => {
     const validateData = registerSchema.parse(req.body);
-    const { firstName, lastName, userName, email, password } = validateData;
-
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [{ email }, { userName }],
-      },
-    });
-
-    if (existingUser) {
-      const message =
-        existingUser.email === email
-          ? "Email is already registered"
-          : "Username is already taken";
-      return next(new AppError(message, httpStatusText.FAIL, 400));
-    }
-
-    const hashPassword = await hashedPassword(password);
-    const user = await prisma.user.create({
-      data: {
-        firstName,
-        lastName,
-        userName,
-        email,
-        password: hashPassword,
-      },
-    });
-    const accessToken = generateAccessToken(user.id);
-    const refreshToken = generateRefreshToken(user.id);
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken },
-    });
+    const { refreshToken, accessToken } = await registerService(validateData);
 
     setRefreshToCookies(res, refreshToken);
     sendResponse(res, 200, httpStatusText.SUCCESS, "Register successfully", {
@@ -71,26 +47,10 @@ export const register = asyncHandler(
 );
 
 export const login = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, _next: NextFunction) => {
     const validateData = loginSchema.parse(req.body);
-    const { email, password } = validateData;
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user)
-      return next(
-        new AppError("Invalid email or password", httpStatusText.FAIL, 400),
-      );
-    const isValidate = await comparePassword(password, user.password);
-    if (!isValidate)
-      return next(
-        new AppError("Invalid email or password", httpStatusText.FAIL, 400),
-      );
-    const accessToken = generateAccessToken(user.id);
-    const refreshToken = generateRefreshToken(user.id);
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken },
-    });
+    const { accessToken, refreshToken } = await loginService(validateData);
 
     setRefreshToCookies(res, refreshToken);
     sendResponse(res, 200, httpStatusText.SUCCESS, "login successfully", {
@@ -101,45 +61,14 @@ export const login = asyncHandler(
 
 export const refreshToken = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
-    const refreshToken = req.cookies?.refreshToken;
-    if (!refreshToken)
+    const oldRefreshToken = req.cookies?.refreshToken;
+    if (!oldRefreshToken)
       return next(
         new AppError("Refresh token is required", httpStatusText.FAIL, 400),
       );
 
-    let decoded: JwtPayload | null;
-
-    decoded = verifyToken(refreshToken, JWT_REFRESH_SECRET) as JwtPayload;
-
-    if (!decoded)
-      return next(
-        new AppError(
-          "Invalid or expired refresh token",
-          httpStatusText.FAIL,
-          401,
-        ),
-      );
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { id: true, refreshToken: true },
-    });
-
-    if (!user || user.refreshToken !== refreshToken)
-      return next(
-        new AppError(
-          "Token mismatch or user not found",
-          httpStatusText.FAIL,
-          403,
-        ),
-      );
-
-    const newAccessToken = generateAccessToken(user.id);
-    const newRefreshToken = generateRefreshToken(user.id);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken: newRefreshToken },
-    });
+    const { accessToken, refreshToken: newRefreshToken } =
+      await refreshTokenService(oldRefreshToken);
 
     setRefreshToCookies(res, newRefreshToken);
     sendResponse(
@@ -148,7 +77,7 @@ export const refreshToken = asyncHandler(
       httpStatusText.SUCCESS,
       "Token refreshed successfully",
       {
-        accessToken: newAccessToken,
+        accessToken: accessToken,
       },
     );
   },
@@ -157,62 +86,29 @@ export const refreshToken = asyncHandler(
 export const logout = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction) => {
     const refreshToken = req.cookies?.refreshToken;
-    if (refreshToken) {
-      const decoded = verifyToken(
-        refreshToken,
-        JWT_REFRESH_SECRET,
-      ) as JwtPayload;
-      if (decoded) {
-        await prisma.user.update({
-          where: { id: decoded.id },
-          data: { refreshToken: null },
-        });
-      }
-    }
+    await logoutService(refreshToken);
+
     res.clearCookie("refreshToken");
     sendResponse(res, 200, httpStatusText.SUCCESS, "Logged out successfully");
   },
 );
 
 export const forgotPassword = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, _next: NextFunction) => {
     const validateData = forgotPasswordSchema.parse(req.body);
-    const { email } = validateData;
-    if (!email)
-      return next(new AppError("Email is required", httpStatusText.FAIL, 400));
-    const user = await prisma.user.findUnique({ where: { email: email } });
-    if (user) {
-      const resetToken = crypto.randomBytes(32).toString("hex");
-      await redis.set(`reset:${resetToken}`, user.id, { EX: 600 });
-      const jwtToken = generatePasswordResetToken(resetToken);
 
-      await sendResetPasswordEmail(email, jwtToken);
-    }
+    await forgotPasswordService(validateData);
 
     sendResponse(res, 200, httpStatusText.SUCCESS, "Reset link sent to email");
   },
 );
 
 export const resetPassword = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, _next: NextFunction) => {
     const validateData = resetPasswordSchema.parse(req.body);
-    const { token } = req.params;
-    const { password } = validateData;
-    const decoded = verifyToken(
-      token as string,
-      JWT_RESET_SECRET,
-    ) as JwtPayload;
-    const userId = await redis.get(`reset:${decoded.token}`);
-    if (!userId)
-      return next(
-        new AppError("Invalid or expired link", httpStatusText.FAIL, 400),
-      );
-    const hashPassword = await hashedPassword(password);
-    await prisma.user.update({
-      where: { id: userId },
-      data: { password: hashPassword },
-    });
-    await redis.del(`reset:${decoded.token}`);
+    const token = req.params.token as string;
+
+    await resetPasswordService(token, validateData);
 
     sendResponse(
       res,
